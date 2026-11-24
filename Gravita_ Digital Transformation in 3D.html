@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gravita: Digital Transformation in 3D</title>
+<style>
+:root{--bg:#f4f6fb;--fg:#0b1020;--mut:#5a6478;--pn:#fff;--ln:#d5dbe8;--ac:#0284c7;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#070b16;--fg:#e8edf8;--mut:#93a0ba;--pn:#101830;--ln:#24304d;--ac:#38bdf8}}
+:root[data-theme="dark"]{--bg:#070b16;--fg:#e8edf8;--mut:#93a0ba;--pn:#101830;--ln:#24304d;--ac:#38bdf8}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;gap:10px;padding:12px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+h1{font-size:20px;margin:0}
+h1 span{color:var(--mut);font-weight:400}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;color:var(--fg);background:var(--pn);border:1px solid var(--ln);border-radius:999px;padding:6px 14px;cursor:pointer}
+button.on{background:var(--ac);border-color:var(--ac);color:#04121f;font-weight:600}
+.kp{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.kp div{background:var(--pn);border:1px solid var(--ln);border-radius:10px;padding:4px 10px;font-size:13px;color:var(--mut)}
+.kp b{color:var(--fg);font-size:15px}
+#stage{position:relative;flex:1;min-height:360px;background:radial-gradient(ellipse at 50% 40%,#16213f,#0b1020 70%);border-radius:16px;overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+.ov{position:absolute;color:#e8edf8;font-size:13px}
+#info{left:14px;bottom:14px;max-width:min(380px,calc(100% - 28px));background:rgba(16,24,48,.85);border:1px solid #2a3a63;border-radius:12px;padding:10px 14px;backdrop-filter:blur(6px)}
+#info b{display:block;font-size:16px;margin-bottom:2px}
+#legend{right:14px;top:14px;display:flex;flex-direction:column;gap:4px}
+#legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+#ctl{right:14px;bottom:14px;display:flex;gap:6px}
+#ctl button{background:rgba(16,24,48,.85);color:#e8edf8;border-color:#2a3a63;padding:6px 12px}
+</style></head><body>
+<header>
+<h1>Gravita India <span>· digital transformation</span></h1>
+<nav id="tabs"></nav>
+<div class="kp">
+<div title="FY25 outcome; not attributed to digital">Revenue <b>₹3,869 cr</b> ▲22.4%</div>
+<div title="FY25 outcome; not attributed to digital">Capacity <b>333,659 MTPA</b> ▲10.2%</div>
+<div>Maturity <b>56.7/100</b></div>
+</div></header>
+<div id="stage">
+<div class="ov" id="legend"></div>
+<div class="ov" id="info"></div>
+<div class="ov" id="ctl"><button id="ra" title="Toggle sway">⟳</button><button id="zi">+</button><button id="zo">−</button></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),stage=$('#stage');
+const BL=0x38bdf8,AM=0xfbbf24,GR=0x64748b,RD=0xf87171,PI=Math.PI;
+const R=new THREE.WebGLRenderer({antialias:true,alpha:true});R.setPixelRatio(Math.min(devicePixelRatio,2));stage.prepend(R.domElement);
+const cv=R.domElement,S=new THREE.Scene(),C=new THREE.PerspectiveCamera(45,1,.1,200);
+S.add(new THREE.AmbientLight(0xffffff,.75));const dl=new THREE.DirectionalLight(0xffffff,.9);dl.position.set(6,9,8);S.add(dl);
+const root=new THREE.Group();S.add(root);
+let rx=.35,ry=0,zoom=22,auto=true,cur,sel=null,hov=null;
+const hex=c=>'#'+c.toString(16).padStart(6,'0');
+const mat=(c,o=1)=>new THREE.MeshStandardMaterial({color:c,roughness:.35,metalness:.25,emissive:c,emissiveIntensity:.18,transparent:o<1,opacity:o});
+function lbl(t,h=.5,col='#e8edf8'){const c=document.createElement('canvas'),x=c.getContext('2d'),f='600 44px system-ui,sans-serif';x.font=f;const w=Math.ceil(x.measureText(t).width)+20;c.width=w;c.height=64;x.font=f;x.fillStyle=col;x.textBaseline='middle';x.fillText(t,10,34);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));s.scale.set(w/64*h,h,1);return s}
+const G=()=>{const g=new THREE.Group();g.userData={p:[],tick(){}};return g};
+function add(g,m,t,d,top){m.userData={t,d};g.userData.p.push(m);(top||g).add(m);return m}
+const ball=(c,r,o)=>new THREE.Mesh(new THREE.SphereGeometry(r,24,16),mat(c,o));
+function edges(m,c){m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),new THREE.LineBasicMaterial({color:c})))}
+function arrow(g,x0,x1,c=BL){const m=mat(c),l=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,x1-x0-.7,12),m);l.rotation.z=PI/2;l.position.x=(x0+x1-.7)/2;const h=new THREE.Mesh(new THREE.ConeGeometry(.42,.8,16),m);h.rotation.z=-PI/2;h.position.x=x1-.4;g.add(l,h)}
+function orbit(g,parent,items,r,c,wire,sz,lab){const tilt=new THREE.Group(),spin=new THREE.Group();tilt.add(spin);parent.add(tilt);tilt.rotation.x=1.1;
+ spin.add(new THREE.Mesh(new THREE.TorusGeometry(r,.03,8,96),mat(c,.5)));
+ items.forEach(([n,d],i)=>{const a=i/items.length*PI*2,m=add(g,ball(c,sz,wire?.45:1),n,d,spin);m.position.set(Math.cos(a)*r,Math.sin(a)*r,0);if(lab){const s=lbl(n,lab);s.position.set(Math.cos(a)*r,Math.sin(a)*r+sz+.35,0);spin.add(s)}});return spin}
+
+function arch(){const g=G(),px=-7,sx=-1,lx=5,ox=9.6;g.position.x=-1;
+ const core=add(g,ball(BL,.85),'Plant-wide data systems','Proprietary IT unifies plant, environment, workflow & safety data');core.position.x=px;
+ const tl=new THREE.Group();tl.position.x=px;g.add(tl);
+ const spin=orbit(g,tl,[['AI sorting','Deep-learning alloy & plastic sorting'],['Automation','Automated material handling'],['Real-time QC','Live quality monitoring in production'],['Environmental data','Plant-wide environmental metrics'],['Digital procurement','Reported; scope not disclosed'],['Traceability','Digital traceability, OEM integration'],['EPR portals','Compliance & third-party portals'],['Workforce safety','Workflow automation & safety systems']],2.5,BL,0,.38);
+ const L1=lbl('Plant-wide data systems',.55);L1.position.set(px,-3.7,0);g.add(L1);
+ const cube=add(g,new THREE.Mesh(new THREE.BoxGeometry(2.8,2.8,2.8),mat(AM,.15)),'Central data store*','Inferred: not publicly documented');edges(cube,AM);cube.position.x=sx;
+ const c2=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.2,1.2),mat(AM,.5));cube.add(c2);
+ const L2=lbl('Central data store*',.55);L2.position.set(sx,-2.6,0);g.add(L2);
+ const lo=add(g,new THREE.Mesh(new THREE.TorusGeometry(2,.16,12,64),mat(AM,.85)),'Automated decision loop*','Inferred: grading, scheduling, quality, compliance choices');lo.position.x=lx;lo.rotation.x=1.1;
+ const ls=new THREE.Group();lo.add(ls);for(let i=0;i<8;i++){const b=ball(AM,.28),a=i/8*PI*2;b.position.set(Math.cos(a)*2,Math.sin(a)*2,0);ls.add(b)}
+ const L3=lbl('Automated decision loop*',.55);L3.position.set(lx,-3.5,0);g.add(L3);
+ [['Optimized production',2],['Predictive maintenance*',0],['Resource efficiency',-2]].forEach(([n,y])=>{const o=add(g,new THREE.Mesh(new THREE.BoxGeometry(1,1,1),mat(AM)),n,n.includes('*')?'Not evidenced as deployed in the report':'Intended outcome (inferred link)');o.position.set(ox,y,0);const s=lbl(n,.45);s.position.set(ox+2.3,y,0);g.add(s)});
+ arrow(g,px+3.3,sx-1.8);arrow(g,sx+1.8,lx-2.6);arrow(g,lx+2.6,ox-.9);
+ const P=[...Array(16)].map(()=>{const b=new THREE.Mesh(new THREE.SphereGeometry(.09,8,8),new THREE.MeshBasicMaterial({color:0xffffff}));g.add(b);return b});
+ g.userData.tick=t=>{spin.rotation.z=t*.3;ls.rotation.z=-t*.6;cube.rotation.y=t*.25;c2.rotation.set(t*.6,t*.4,0);P.forEach((b,i)=>{const u=(t*.07+i/16)%1;b.position.set(px+3+u*(ox-px-4),Math.sin(u*30+i)*.18,0)})};return g}
+
+function mature(){const g=G(),D=[['Digital strategy',3,'✓ Growth & traceability agenda\n✗ No funded roadmap or digital KPIs'],['Technology adoption',3,'✓ AI sorting, automation, live QC\n✗ No coverage or yield metrics'],['Data & analytics',3,'✓ Plant-wide data systems\n✗ No dashboards or predictive models'],['Process integration',3,'✓ Procurement, OEM & EPR portals\n✗ ERP backbone unconfirmed'],['Customer experience',3,'✓ Traceability, OEM integration\n✗ No self-service platform'],['People & culture',2,'✓ Training & safety systems\n✗ Digital skills unmeasured']];
+ g.add(new THREE.GridHelper(16,16,0x334155,0x1e293b));
+ D.forEach(([n,s,d],i)=>{const x=(i-2.5)*2.5,h=s*.9,gh=new THREE.Mesh(new THREE.BoxGeometry(1.5,4.5,1.5),mat(GR,.04));gh.position.set(x,2.25,0);edges(gh,0x3b4a66);g.add(gh);
+  const b=add(g,new THREE.Mesh(new THREE.BoxGeometry(1.5,h,1.5),mat(s>2?BL:AM)),n+' · '+s+'/5',d);b.position.set(x,h/2,0);b.userData.h=h;
+  const a=lbl(n,.42);a.position.set(x,-.7,1.2);g.add(a);const v=lbl(s+'/5',.6);v.position.set(x,h+.7,0);g.add(v)});
+ const T=lbl('56.7 / 100 · Established (17/30)',.8);T.position.set(0,6.3,0);g.add(T);
+ g.userData.tick=t=>g.userData.p.forEach((b,i)=>{const k=Math.min(1,Math.max(0,t*1.2-i*.15)),e=1-Math.pow(1-Math.min(1,(performance.now()-g.userData.t0)/700+0*k),3);b.position.y=b.userData.h*e/2;b.scale.y=Math.max(.01,e)});return g}
+
+function tech(){const g=G();const co=add(g,ball(0xffffff,.9),'Gravita','Recycler: lead, aluminium, plastic, rubber');
+ const a=orbit(g,g,[['AI sorting','Deep-learning alloy & plastic sorting'],['Automation','Automated handling, less downtime'],['Real-time QC','Integrated production + live quality'],['Plant data systems','Proprietary IT, environmental metrics'],['Traceability','Digital traceability & OEM integration'],['EPR portals','Digital compliance & coordination'],['Digital procurement','Reported; scope not disclosed']],2.6,BL,0,.34,.4);
+ const b=orbit(g,g,[['Blockchain','Future initiative only'],['IoT sensor network','Future initiative only']],4.3,AM,0,.34,.4);
+ const c=orbit(g,g,[['Generative AI','No evidence found'],['NLP','No evidence found'],['RPA','No evidence found'],['Predictive maintenance','No evidence found'],['ML decision models','No evidence found']],6,GR,1,.34,.4);
+ g.userData.tick=t=>{a.rotation.z=t*.18;b.rotation.z=-t*.12;c.rotation.z=t*.07};return g}
+
+function road(){const g=G(),H=[4.6,3.8,3,2.3,1.6],D=[['Operating model','Group digital model: 90-day system inventory, owners, funded 2-yr roadmap, baseline KPIs'],['Cyber & payment controls','Out-of-band bank-detail checks, dual approval, phishing drills · after ₹2.43 cr FY25 diversion'],['Traceability pilots','Lead + plastics batch chain-of-custody; scale after data-quality review'],['Analytics & skills','Yield, energy, downtime, quality teams; validated models only'],['Public evidence','Disclose site coverage, outcomes, skills hours, security indicators']];
+ D.forEach(([n,d],i)=>{const x=(i-2)*2.5,b=add(g,new THREE.Mesh(new THREE.BoxGeometry(2,H[i],2),mat(i==1?RD:BL)),(i+1)+'. '+n,d);b.position.set(x,H[i]/2,0);b.userData.h=H[i];edges(b,0xffffff);const l=lbl(n,.42);l.position.set(x,-.7,1.5);g.add(l);const k=lbl(String(i+1),.9);k.position.set(x,H[i]+.8,0);g.add(k)});
+ g.add(new THREE.GridHelper(16,16,0x334155,0x1e293b));g.userData.tick=()=>{};return g}
+
+const TABS=[['Architecture',arch,24,[[BL,'Disclosed'],[AM,'Inferred *']]],['Maturity',mature,16,[[BL,'Score 3'],[AM,'Score 2'],[GR,'Headroom to 5']]],['Tech map',tech,16,[[BL,'Deployed'],[AM,'Planned'],[GR,'Not evidenced']]],['Roadmap',road,17,[[BL,'Priority'],[RD,'Risk-driven']]]];
+TABS.forEach(t=>{t.g=t[1]();t.g.visible=false;root.add(t.g)});
+function show(){const i=hov||sel;$('#info').innerHTML=i?`<b>${i.userData.t}</b>${i.userData.d.replace(/\n/g,'<br>')}`:'Hover or tap any shape · drag to rotate · scroll to zoom'}
+function tab(i){TABS.forEach((t,j)=>{t.g.visible=i==j;$('#tabs').children[j].classList.toggle('on',i==j)});const t=TABS[i];cur=t.g;cur.userData.k=0;cur.userData.t0=performance.now();zoom=t[2];sel=hov=null;$('#legend').innerHTML=t[3].map(([c,l])=>`<div><i style="background:${hex(c)}"></i>${l}</div>`).join('');show()}
+TABS.forEach((t,i)=>{const b=document.createElement('button');b.textContent=t[0];b.onclick=()=>tab(i);$('#tabs').append(b)});
+const rc=new THREE.Raycaster(),v2=new THREE.Vector2();
+function pick(e){const r=cv.getBoundingClientRect();v2.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);rc.setFromCamera(v2,C);const h=rc.intersectObjects(cur.userData.p,false)[0];const n=h?h.object:null;if(n!==hov){hov=n;show()}cv.style.cursor=n?'pointer':'grab'}
+let dn=null,mv=0;
+cv.addEventListener('pointerdown',e=>{dn={x:e.clientX,y:e.clientY};mv=0;cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(dn){const dx=e.clientX-dn.x,dy=e.clientY-dn.y;mv+=Math.abs(dx)+Math.abs(dy);ry+=dx*.008;rx=Math.max(-1.2,Math.min(1.2,rx+dy*.006));dn={x:e.clientX,y:e.clientY}}pick(e)});
+cv.addEventListener('pointerup',e=>{if(mv<6){pick(e);sel=hov;show()}dn=null});
+cv.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(7,Math.min(45,zoom*(1+e.deltaY*.001)))},{passive:false});
+$('#ra').onclick=()=>{auto=!auto};$('#zi').onclick=()=>{zoom=Math.max(7,zoom*.85)};$('#zo').onclick=()=>{zoom=Math.min(45,zoom*1.18)};
+function rs(){const w=stage.clientWidth,h=stage.clientHeight;R.setSize(w,h);C.aspect=w/h;C.updateProjectionMatrix()}new ResizeObserver(rs).observe(stage);
+let t=0,last=performance.now();
+function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;
+ const u=cur.userData;u.k=Math.min(1,u.k+dt*2);cur.scale.setScalar(Math.max(.001,1-Math.pow(1-u.k,3)));u.tick(t);
+ u.p.forEach(p=>{const g=(p===hov||p===sel)?1.15:1;p.scale.x+=(g-p.scale.x)*.2;p.scale.z=p.scale.x;if(!p.userData.h)p.scale.y=p.scale.x});
+ root.rotation.set(rx,ry+(auto?Math.sin(t*.35)*.3:0),0);C.position.set(0,0,zoom);C.lookAt(0,0,0);R.render(S,C)}
+rs();tab(0);requestAnimationFrame(loop);
+</script></body></html>
